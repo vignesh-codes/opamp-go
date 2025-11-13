@@ -4,6 +4,8 @@ Extension of https://github.com/open-telemetry/opamp-go/
 
 Added a new example here: https://github.com/vignesh-codes/opamp-go/tree/feat/v0.1/internal/examples/opamp-api-and-mcp-server
 
+NOTE: Code cleanings in progress
+
 # OpAMP Topology Server
 
 OpAMP Topology Server provides a unified, real-time view of your entire OpenTelemetry Collector fleet.  
