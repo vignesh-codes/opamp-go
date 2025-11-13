@@ -2,6 +2,7 @@
 
 Extension of https://github.com/open-telemetry/opamp-go/ 
 
+Added a new example here: https://github.com/vignesh-codes/opamp-go/tree/feat/v0.1/internal/examples/opamp-api-and-mcp-server
 
 # OpAMP Topology Server
 
@@ -9,6 +10,8 @@ OpAMP Topology Server provides a unified, real-time view of your entire OpenTele
 It runs both an **OpAMP server** (for agent management) and an **API server** (for topology visualization and insights) within a single Go service.
 
 This project helps teams understand, observe, and optimize their telemetry pipeline performance through live topology data, configuration intelligence, and AI-driven insights.
+
+![topology graph](https://github.com/vignesh-codes/opamp-go/blob/feat/v0.1/internal/examples/opamp-api-and-mcp-server/assets/topology-graph-flow-rate.png)
 
 ---
 
