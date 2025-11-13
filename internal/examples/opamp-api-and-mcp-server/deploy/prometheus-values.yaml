@@ -1,0 +1,52 @@
+
+server:
+  replicas: 1
+  persistentVolume:
+    enabled: false
+  retention: 15d
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  service:
+    type: ClusterIP
+    annotations: {}
+
+serverFiles:
+  prometheus.yml:
+    scrape_configs:
+      - job_name: 'otel-gateway'
+        static_configs:
+          - targets: ['otel-gateway-metrics.otel-gateway.svc.cluster.local:8888']
+            labels:
+              component: 'otel-gateway'
+
+      - job_name: 'otel-agent'
+        static_configs:
+          - targets: ['otel-agent-metrics.otel-agent.svc.cluster.local:8888']
+            labels:
+              component: 'otel-agent'
+  recording_rules.yml: {}
+  alerting_rules.yml: {}
+  alerts: {}
+  rules: {}
+
+serviceAccount:
+  create: true
+  name: prometheus
+
+rbac:
+  create: true
+
+nodeExporter:
+  enabled: false
+
+pushgateway:
+  enabled: false
+
+alertmanager:
+  enabled: false
+

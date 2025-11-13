@@ -1,0 +1,185 @@
+mode: daemonset
+image:
+  repository: otel/opentelemetry-collector-contrib
+  tag: 0.139.0
+command:
+  name: otelcol-contrib
+hostNetwork: true
+dnsPolicy: ClusterFirstWithHostNet
+
+extraEnvs:
+  - name: NODE_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: spec.nodeName
+  - name: K8S_POD_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.name
+  - name: K8S_NODE_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: spec.nodeName
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+extraVolumes:
+  - name: varlog
+    hostPath:
+      path: /var/log
+      type: Directory
+
+extraVolumeMounts:
+  - name: varlog
+    mountPath: /var/log
+    readOnly: true
+
+config:
+  extensions:
+    health_check:
+      endpoint: 0.0.0.0:13133
+    opamp:
+      server:
+        ws:
+          endpoint: "wss://host.docker.internal:4320/v1/opamp"
+          tls:
+            insecure_skip_verify: true
+      capabilities:
+        reports_effective_config: true
+        reports_health: true
+        reports_available_components: true
+
+  receivers:
+    filelog:
+      include:
+        - /var/log/containers/*.log
+      start_at: beginning
+      include_file_path: true
+      include_file_name: true
+
+    kubeletstats:
+      collection_interval: 15s
+      endpoint: https://${env:NODE_NAME}:10250
+      auth_type: serviceAccount
+      insecure_skip_verify: true
+      metric_groups: [node, pod, container]
+
+    hostmetrics:
+      collection_interval: 30s
+      scrapers:
+        cpu: {}
+        load: {}
+        memory: {}
+        filesystem: {}
+        network: {}
+        process: {}
+
+
+  processors:
+    k8sattributes:
+      auth_type: serviceAccount
+      passthrough: false
+      extract:
+        metadata:
+          - k8s.namespace.name
+          - k8s.pod.name
+          - k8s.container.name
+        labels:
+          - key_regex: .*
+        annotations:
+          - key_regex: .*
+      pod_association:
+        - sources:
+            - from: resource_attribute
+              name: k8s.pod.name
+        - sources:
+            - from: resource_attribute
+              name: k8s.namespace.name
+            - from: resource_attribute
+              name: k8s.pod.name
+    transform:
+      log_statements:
+        - context: log
+          statements:
+            - set(attributes["_filename"], Split(attributes["log.file.path"], "/")[4]) where attributes["log.file.path"] != nil and IsMatch(attributes["log.file.path"], "^/var/log/containers/")
+            - set(attributes["_filename_parts"], Split(attributes["_filename"], "_")) where attributes["_filename"] != nil
+            - set(resource.attributes["k8s.pod.name"], attributes["_filename_parts"][0]) where attributes["_filename_parts"] != nil and Len(attributes["_filename_parts"]) > 0
+            - set(resource.attributes["k8s.namespace.name"], attributes["_filename_parts"][1]) where attributes["_filename_parts"] != nil and Len(attributes["_filename_parts"]) > 1
+            - set(attributes["_container_with_hash"], attributes["_filename_parts"][2]) where attributes["_filename_parts"] != nil and Len(attributes["_filename_parts"]) > 2
+            - set(resource.attributes["k8s.container.name"], Split(attributes["_container_with_hash"], "-")[0]) where attributes["_container_with_hash"] != nil
+            - delete_key(attributes, "_filename")
+            - delete_key(attributes, "_filename_parts")
+            - delete_key(attributes, "_container_with_hash")
+
+    resource:
+      attributes:
+        - key: environment
+          value: dev
+          action: upsert
+        - key: cluster
+          value: local-k8s
+          action: upsert
+        - key: noise.attr1
+          value: "xk3h82ls9p0q"
+          action: upsert
+        - key: noise.attr2
+          value: "3984jf9sd93jfw9sd2j3f9jsdf"
+          action: upsert
+
+    filter/metrics:
+      metrics:
+        metric:
+          - 'resource.attributes["k8s.namespace.name"] == "kube-system"'
+          - 'resource.attributes["k8s.namespace.name"] == "default"'
+          - 'resource.attributes["k8s.namespace.name"] == "prometheus"'
+          - 'resource.attributes["k8s.namespace.name"] == "otel-gateway"'
+
+    filter/logs:
+      error_mode: ignore
+      logs:
+        log_record:
+          - 'resource.attributes["k8s.namespace.name"] == "kube-system"'
+          - 'resource.attributes["k8s.namespace.name"] == "default"'
+          - 'resource.attributes["k8s.namespace.name"] == "prometheus"'
+          - 'resource.attributes["k8s.namespace.name"] == "otel-gateway"'
+
+    batch: {}
+
+  exporters:
+    otlp:
+      endpoint: otel-gateway-opentelemetry-collector.otel-gateway.svc.cluster.local:4317
+      tls:
+        insecure: true
+
+  service:
+    extensions: [health_check, opamp]
+    telemetry:
+      resource:
+        service.name: ${env:K8S_POD_NAME}
+      metrics:
+        level: detailed
+        readers:
+          - pull:
+              exporter:
+                prometheus:
+                  host: "0.0.0.0"
+                  port: 8888
+      logs:
+        level: debug
+
+    pipelines:
+      metrics:
+        receivers: [hostmetrics, kubeletstats]
+        processors: [k8sattributes, filter/metrics, batch]
+        exporters: [otlp]
+
+      logs:
+        receivers: [filelog]
+        processors: [transform, k8sattributes, resource, filter/logs, batch]
+        exporters: [otlp]

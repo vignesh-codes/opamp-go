@@ -1,0 +1,90 @@
+mode: deployment
+replicaCount: 1
+image:
+  repository: otel/opentelemetry-collector-contrib
+  tag: 0.139.0
+command:
+  name: otelcol-contrib
+
+resources:
+  limits:
+    cpu: 300m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+service:
+  annotations: {}
+
+config:
+  extensions:
+    health_check:
+      endpoint: 0.0.0.0:13133
+
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+  processors:
+
+    filter/metrics:
+      metrics:
+        metric:
+          - 'IsMatch(name, ".*process_runtime.*")'
+          - 'IsMatch(name, ".*grpc_io.*")'
+          - 'IsMatch(name, ".*system_cpu.*")'
+          - 'resource.attributes["environment"] == "test"'
+
+    filter/logs:
+      logs:
+        log_record:
+          - 'resource.attributes["k8s.namespace.name"] == "kube-system"'
+          - 'resource.attributes["k8s.container.name"] == "istio-proxy"'
+          - 'severity_text == "DEBUG"'
+          - 'attributes["drop"] == true'
+
+    memory_limiter:
+      check_interval: 5s
+      limit_mib: 400
+      spike_limit_mib: 100
+
+    batch:
+      send_batch_size: 8192
+      timeout: 10s
+
+  exporters:
+    debug:
+      verbosity: detailed
+
+
+  service:
+    extensions: [health_check]
+
+    telemetry:
+      resource:
+        service.name: otel-gateway
+      logs:
+        level: info
+      metrics:
+        level: detailed
+        readers:
+          - pull:
+              exporter:
+                prometheus:
+                  host: '0.0.0.0'
+                  port: 8888
+
+    pipelines:
+      metrics:
+        receivers: [otlp]
+        processors: [memory_limiter, filter/metrics, batch]
+        exporters: [debug]
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, filter/logs, batch]
+        exporters: [debug]

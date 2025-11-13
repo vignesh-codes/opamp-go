@@ -1,8 +1,3 @@
-# OpAMP protocol implementation in Go
-
-Extension of https://github.com/open-telemetry/opamp-go/ 
-
-
 # OpAMP Topology Server
 
 OpAMP Topology Server provides a unified, real-time view of your entire OpenTelemetry Collector fleet.  

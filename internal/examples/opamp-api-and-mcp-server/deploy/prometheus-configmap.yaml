@@ -1,0 +1,33 @@
+# ConfigMap for Prometheus configuration
+# This bypasses the Helm chart's config generation to avoid merge conflicts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: prometheus
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      scrape_timeout: 10s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'local'
+        environment: 'dev'
+
+    scrape_configs:
+      # Scrape metrics from otel-gateway service
+      - job_name: 'otel-gateway'
+        static_configs:
+          - targets: ['otel-gateway-metrics.otel-gateway.svc.cluster.local:8888']
+            labels:
+              component: 'otel-gateway'
+
+      # Scrape metrics from otel-agent service (DaemonSet)
+      - job_name: 'otel-agent'
+        static_configs:
+          - targets: ['otel-agent-metrics.otel-agent.svc.cluster.local:8888']
+            labels:
+              component: 'otel-agent'
+
+
