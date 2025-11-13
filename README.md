@@ -108,48 +108,9 @@ Make sure to update the claude_desktop_config.json
 
 ## Architecture
 
-The server follows Go best practices with a clean, modular structure:
+![architecture](https://github.com/vignesh-codes/opamp-go/blob/feat/v0.1/internal/examples/opamp-api-and-mcp-server/assets/architecture.png)
 
-```
-mcp-server/
-├── cmd/
-│   └── server/
-│       └── main.go              # Entry point
-├── deploy/                      # Helm deployment files
-│   ├── otel-agent-values.yaml
-│   ├── otel-gateway-values.yaml
-│   ├── prometheus-values.yaml
-│   ├── otel-agent-metrics-svc.yaml
-│   ├── otel-gateway-metrics-svc.yaml
-│   └── README.md
-├── internal/
-│   ├── api/                     # HTTP handlers
-│   │   ├── handlers.go
-│   │   └── handlers_test.go
-│   ├── config/                  # Configuration parsing
-│   │   ├── config.go
-│   │   └── config_test.go
-│   ├── metrics/                 # Metrics scraping
-│   │   ├── metrics.go
-│   │   └── metrics_test.go
-│   ├── prometheus/             # Prometheus queries
-│   │   ├── prometheus.go
-│   │   └── prometheus_test.go
-│   ├── server/                 # OpAMP server wrapper
-│   │   ├── opamp.go
-│   │   └── opamp_test.go
-│   ├── topology/               # Topology graph builder
-│   │   ├── topology.go
-│   │   └── topology_test.go
-│   ├── types/                  # Type definitions
-│   │   └── types.go
-│   └── view/                   # HTML view templates
-│       ├── view.go
-│       └── view_test.go
-├── go.mod
-├── go.sum
-└── README.md
-```
+I added prometheus just for the POC on how to achieve getting the rate of data flow. Ideally we might wanna add a custom lightweight processor to aggregate these metrics exposed by otelcol /metrics endpoint and then capture at a centralized server for final aggregation. This provides a stronger insight on how the data is flowing and helps in identifying the config bottlenecks in otelcol components. 
 
 ## Endpoints
 
